@@ -7,9 +7,9 @@
 #define AVG_WINDOW 10
 
 // Target value for ir controller
-#define TARGET_EMF 62
+#define TARGET_EMF 245
 // How many points of difference is needed change pwm by one step
-#define DELTA_COEFF 1
+#define POSITION_COEFF 1
 #define INTEGRAL_COEFF 2
 
 // Debugging definitions

@@ -19,6 +19,7 @@
 
 #include "Atmega328pUtils.h"
 #include "AveragingDataSet.h"
+#include "PiController.h"
 
 /// Initializes pin D6 as phase correct pwm.
 ///
@@ -88,18 +89,6 @@ uint16_t senseEmf() {
   return 1023 - ADC;
 }
 
-// TODO: Is this still needed?
-void control(uint32_t reading) {
-    static int32_t integral = 0;
-    static uint16_t counter = 0;
-
-    int32_t delta = reading - TARGET_EMF;
-    integral += delta;
-
-    int32_t pwmValue = ((delta / DELTA_COEFF) + (integral / INTEGRAL_COEFF));
-    enablePwm(TARGET_EMF-pwmValue);
-}
-
 #ifdef DEBUG
   /// Initializes resources needed for debugging.
   void initializeDebug() {
@@ -140,6 +129,7 @@ int main() {
   #endif
 
   AveragingDataSet readings(0);
+  PiController controller(TARGET_EMF, POSITION_COEFF, INTEGRAL_COEFF);
   while(true) {
     // Run motor
     _delay_ms(5);
@@ -152,7 +142,8 @@ int main() {
       readings.add(senseEmf(), false);
     }
 
-    control(readings.average()/4);
+    int16_t newPwm = controller.control(readings.average());
+    enablePwm(newPwm/4);
 
     #ifdef DEBUG
       printDebugInfo(readings.average()/128);
