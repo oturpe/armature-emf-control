@@ -14,5 +14,5 @@
 
 // Debugging definitions
 //#define DEBUG
-#define DEBUG_FREQ 1
+#define DEBUG_FREQ 180
 

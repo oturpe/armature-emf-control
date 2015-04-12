@@ -21,6 +21,9 @@
 #include "AveragingDataSet.h"
 #include "PiController.h"
 
+#ifdef DEBUG
+#include "Debug.h"
+#endif
 /// Initializes pin D6 as phase correct pwm.
 ///
 /// Initialization does not include enabling pwm. That can is done using
@@ -89,50 +92,19 @@ uint16_t senseEmf() {
   return 1023 - ADC;
 }
 
-#ifdef DEBUG
-  /// Initializes resources needed for debugging.
-  void initializeDebug() {
-    // Pin D5 as output.
-    DDRD |= BV(DDD5);
-  }
-
-  /// Prints debug information
-  ///
-  /// This crude implementation flashes a led connected to pin D5. This is only
-  /// done every DEBUG_FREQ calls to avoid spending all the time flashing the
-  /// led.
-  ///
-  /// \param value
-  ///     Value to report
-  void printDebugInfo(uint16_t value) {
-    static uint16_t counter = 0;
-
-    counter = (counter + 1) % DEBUG_FREQ;
-    if(counter)
-      return;
-
-    for(uint16_t i = 0; i < value; i++) {
-      PORTD |= BV(PORTD5);
-      _delay_ms(50);
-      PORTD &= ~BV(PORTD5);
-      _delay_ms(50);
-    }
-  }
-#endif
-
 int main() {
   initializePwm();
   initializeEmfSense();
 
   #ifdef DEBUG
-    initializeDebug();
+    Debug debug(DEBUG_FREQ);
   #endif
 
   AveragingDataSet readings(0);
   PiController controller(TARGET_EMF, POSITION_COEFF, INTEGRAL_COEFF);
   while(true) {
     // Run motor
-    _delay_ms(5);
+    _delay_ms(20);
 
     // Disable pwm for measurement time
     disablePwm();
@@ -146,7 +118,7 @@ int main() {
     enablePwm(newPwm/4);
 
     #ifdef DEBUG
-      printDebugInfo(readings.average()/128);
+      debug.printInfo(readings.average()/100);
     #endif
   }
 }
