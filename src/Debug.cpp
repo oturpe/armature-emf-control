@@ -6,13 +6,13 @@
 #include "Atmega328pUtils.h"
 
 Debug::Debug(uint16_t reportingFrequency)
-  : reportingFrequency(reportingFrequency) {
+  : reportingFrequency(reportingFrequency), counter(0) {
   // Pin D5 as output.
   DDRD |= BV(DDD5);
 }
 
 
-void Debug::printInfo(uint16_t value)  {
+void Debug::printInfo(uint16_t value) {
   counter = (counter + 1) % reportingFrequency;
   if(counter)
     return;

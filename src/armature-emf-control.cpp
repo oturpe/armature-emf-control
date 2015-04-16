@@ -41,33 +41,38 @@ void initializePwm() {
   Atmega328p::setTimer0Prescaler(PWM_PRESCALER);
 }
 
+/// Enables pwm output retaining the duty cycle that was in effect when it was
+/// last disabled.
+void enablePwm() {
+  TCCR0A |= BV(COM0A1);
+}
+
 /// Enables pwm output using given duty cycle.
 ///
 /// \param value
 ///    Requested duty cycle value
 void enablePwm(uint8_t value) {
   OCR0A = value;
-  TCCR0A |= BV(COM0A1);
+  enablePwm();
 }
 
-/// Disables pwm output.
+/// Disables pwm output. It can be enabled again with either enablePwm() or
+/// enablePwm(uint8_t) function.
 void disablePwm() {
   TCCR0A &= ~BV(COM0A1);
 }
 
-/// Initializes motor's electro motive force sensing with analog to digital
-/// conversion by setting the reference.
-void initializeEmfSense() {
+/// Initializes analog to digital conversion by setting the reference and
+/// prescaler.
+void initializeAdc() {
   Atmega328p::setVoltageReference(Atmega328p::VREF_VCC);
   Atmega328p::setAdcPrescalerValue(Atmega328p::ADC_PSV_128);
 
-  // Use analog input ADC1 with digital input disabled
-  // AD0 is the default, no need to set MUXn bits of ADMUX
-  // ADMUX |= BV(MUX0);
-  DIDR0 |= BV(ADC0D);
-
   // Enable adc
   ADCSRA |= BV(ADEN);
+
+// Disable digital inout from pins that are used for adc.
+  DIDR0 |= BV(ADC0D) | BV(ADC1D) | BV(ADC2D);
 }
 
 /// Sense motor's electromotive force.
@@ -84,6 +89,9 @@ void initializeEmfSense() {
 /// \return
 ///   Voltage inverse
 uint16_t senseEmf() {
+  // Select analog input ADC0
+   ADMUX &= ~BV(MUX0) & ~BV(MUX1) & ~BV(MUX2) & ~BV(MUX3);
+
   // start conversion and wait until value is available
   ADCSRA |= BV(ADSC);
   while(ADCSRA & BV(ADSC));
@@ -92,9 +100,95 @@ uint16_t senseEmf() {
   return 1023 - ADC;
 }
 
+enum Direction {
+  D_CLOCKWISE,
+  D_COUNTER_CLOCKWISE,
+  D_NONE,
+  D_BOTH
+};
+
+/// Reads analog sensor readings of rotation sensor. If one of the values
+/// exceeds the threshold, returns the direction corresponding to the sensor.
+///
+/// \return
+///    The sensor that has a reading
+Direction senseRotationLimit() {
+  bool clockwiseSensor = false;
+  bool counterClockwiseSensor = false;
+
+  ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX1);
+  ADMUX |= BV(MUX0);
+
+  // start conversion and wait until value is available
+  ADCSRA |= BV(ADSC);
+  while(ADCSRA & BV(ADSC));
+
+  if (ADC > POSITION_SENSOR_THRESHOLD_CW)
+    clockwiseSensor = true;
+
+  // Select analog input ADC1
+ ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX0);
+ ADMUX |= BV(MUX1);
+
+  // start conversion and wait until value is available
+  ADCSRA |= BV(ADSC);
+  while(ADCSRA & BV(ADSC));
+
+  if (ADC > POSITION_SENSOR_THRESHOLD_CCW)
+    counterClockwiseSensor = true;
+
+if(clockwiseSensor && counterClockwiseSensor)
+  return D_BOTH;
+
+if(!clockwiseSensor && !counterClockwiseSensor)
+  return D_NONE;
+
+return clockwiseSensor ? D_CLOCKWISE : D_COUNTER_CLOCKWISE;
+}
+
+/// Stops the motor and loops endlessly. This function in intended for stopping
+/// operation case something unexpected happens
+void halt() {
+  disablePwm();
+  PORTD |= BV(PORTD5);
+  while(true);
+}
+
+/// Initializes the pin that is used to control direction setting.
+void initializeDirectionSetting() {
+  // Set PD7 as output
+  DDRD |= BV(DDD7);
+}
+
+/// Sets motor rotation direction. Disables pwm, waits a while, flips the relay
+/// and enables pwm again.
+///
+/// \param direction
+///    Direction to rotate to. For D_NONE or D_BOTH does not change the
+///    direction.
+void setDirection(Direction direction) {
+
+  disablePwm();
+  _delay_ms(200);
+
+  switch(direction) {
+  case D_CLOCKWISE:
+    PORTD &= ~BV(PORTD7);
+    break;
+  case D_COUNTER_CLOCKWISE:
+    PORTD |= BV(PORTD7);
+    break;
+  default:
+    break;
+  }
+
+  enablePwm();
+}
+
 int main() {
   initializePwm();
-  initializeEmfSense();
+  initializeAdc();
+  initializeDirectionSetting();
 
   #ifdef DEBUG
     Debug debug(DEBUG_FREQ);
@@ -114,11 +208,25 @@ int main() {
       readings.add(senseEmf(), false);
     }
 
+    Direction direction = senseRotationLimit();
+    switch(direction) {
+    case D_CLOCKWISE:
+    case D_COUNTER_CLOCKWISE:
+      setDirection(direction);
+      break;
+    case D_NONE:
+      // Nothing to do
+      break;
+    case D_BOTH:
+      //halt();
+      break;
+    }
+
     int16_t newPwm = controller.control(readings.average());
     enablePwm(newPwm/4);
 
     #ifdef DEBUG
-      debug.printInfo(readings.average()/100);
+      //debug.printInfo(0);
     #endif
   }
 }
