@@ -116,6 +116,7 @@ Direction senseRotationLimit() {
   bool clockwiseSensor = false;
   bool counterClockwiseSensor = false;
 
+  // Read clockwise sensr from pin ADC1
   ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX1);
   ADMUX |= BV(MUX0);
 
@@ -126,7 +127,7 @@ Direction senseRotationLimit() {
   if (ADC > POSITION_SENSOR_THRESHOLD_CW)
     clockwiseSensor = true;
 
-  // Select analog input ADC1
+  // Read counter clockwise sensor from pin ADC2
  ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX0);
  ADMUX |= BV(MUX1);
 
@@ -169,7 +170,7 @@ void initializeDirectionSetting() {
 void setDirection(Direction direction) {
 
   disablePwm();
-  _delay_ms(200);
+  _delay_ms(1000);
 
   switch(direction) {
   case D_CLOCKWISE:
@@ -203,11 +204,6 @@ int main() {
     // Disable pwm for measurement time
     disablePwm();
 
-    for(int i = 0; i < AVG_WINDOW; i++) {
-      _delay_ms(1);
-      readings.add(senseEmf(), false);
-    }
-
     Direction direction = senseRotationLimit();
     switch(direction) {
     case D_CLOCKWISE:
@@ -222,11 +218,16 @@ int main() {
       break;
     }
 
+    for(int i = 0; i < AVG_WINDOW; i++) {
+      _delay_ms(1);
+      readings.add(senseEmf(), false);
+    }
+
     int16_t newPwm = controller.control(readings.average());
     enablePwm(newPwm/4);
 
     #ifdef DEBUG
-      //debug.printInfo(0);
+      //debug.printInfo(4);
     #endif
   }
 }

@@ -1,5 +1,5 @@
 // Cpu frequency for util/delay.h
-#define F_CPU 16000000
+#define F_CPU 8000000
 
 #define PWM_PRESCALER Atmega328p::PSV_8
 #define PWM_INITIAL 0
@@ -12,10 +12,10 @@
 #define POSITION_COEFF 1
 #define INTEGRAL_COEFF 2
 
-#define POSITION_SENSOR_THRESHOLD_CW 575
-#define POSITION_SENSOR_THRESHOLD_CCW 605
+#define POSITION_SENSOR_THRESHOLD_CW 460
+#define POSITION_SENSOR_THRESHOLD_CCW 460
 
 // Debugging definitions
 #define DEBUG
-#define DEBUG_FREQ 10
+#define DEBUG_FREQ 5
 
