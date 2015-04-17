@@ -4,7 +4,9 @@
 #define PWM_PRESCALER Atmega328p::PSV_1
 #define PWM_INITIAL 0
 
-#define AVG_WINDOW 10
+#define ADC_PRESCALER Atmega328p::ADC_PSV_32
+
+#define AVG_WINDOW 3
 
 // Target value for ir controller
 #define TARGET_EMF /*245*/ 300

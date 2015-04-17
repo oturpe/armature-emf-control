@@ -10,20 +10,21 @@
 // Author: Otto Urpelainen
 // Email: oturpe@iki.fi
 
-// TODOS:
-
 #include "config.h"
 
 #include <avr/io.h>
 #include <util/delay.h>
 
 #include "Atmega328pUtils.h"
+
 #include "AveragingDataSet.h"
 #include "PiController.h"
+#include "LimitSensor.h"
 
 #ifdef DEBUG
 #include "Debug.h"
 #endif
+
 /// Initializes pin D6 as phase correct pwm.
 ///
 /// Initialization does not include enabling pwm. That can is done using
@@ -66,7 +67,7 @@ void disablePwm() {
 /// prescaler.
 void initializeAdc() {
   Atmega328p::setVoltageReference(Atmega328p::VREF_VCC);
-  Atmega328p::setAdcPrescalerValue(Atmega328p::ADC_PSV_32);
+  Atmega328p::setAdcPrescalerValue(ADC_PRESCALER);
 
   // Enable adc
   ADCSRA |= BV(ADEN);
@@ -100,53 +101,6 @@ uint16_t senseEmf() {
   return 1023 - ADC;
 }
 
-enum Direction {
-  D_CLOCKWISE,
-  D_COUNTER_CLOCKWISE,
-  D_NONE,
-  D_BOTH
-};
-
-/// Reads analog sensor readings of rotation sensor. If one of the values
-/// exceeds the threshold, returns the direction corresponding to the sensor.
-///
-/// \return
-///    The sensor that has a reading
-Direction senseRotationLimit() {
-  bool clockwiseSensor = false;
-  bool counterClockwiseSensor = false;
-
-  // Read clockwise sensr from pin ADC1
-  ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX1);
-  ADMUX |= BV(MUX0);
-
-  // start conversion and wait until value is available
-  ADCSRA |= BV(ADSC);
-  while(ADCSRA & BV(ADSC));
-
-  if (ADC > POSITION_SENSOR_THRESHOLD_CW)
-    clockwiseSensor = true;
-
-  // Read counter clockwise sensor from pin ADC2
- ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX0);
- ADMUX |= BV(MUX1);
-
-  // start conversion and wait until value is available
-  ADCSRA |= BV(ADSC);
-  while(ADCSRA & BV(ADSC));
-
-  if (ADC > POSITION_SENSOR_THRESHOLD_CCW)
-    counterClockwiseSensor = true;
-
-if(clockwiseSensor && counterClockwiseSensor)
-  return D_BOTH;
-
-if(!clockwiseSensor && !counterClockwiseSensor)
-  return D_NONE;
-
-return clockwiseSensor ? D_CLOCKWISE : D_COUNTER_CLOCKWISE;
-}
-
 /// Stops the motor and loops endlessly. This function in intended for stopping
 /// operation case something unexpected happens
 void halt() {
@@ -161,15 +115,12 @@ void initializeDirectionSetting() {
   DDRD |= BV(DDD7);
 }
 
-/// Sets motor rotation direction. Disables pwm, waits a while, flips the relay
-/// and enables pwm again.
+/// Sets motor rotation direction by flipping the relay.
 ///
 /// \param direction
 ///    Direction to rotate to. For D_NONE or D_BOTH does not change the
 ///    direction.
 void setDirection(Direction direction) {
-  _delay_ms(500);
-
   switch(direction) {
   case D_CLOCKWISE:
     PORTD &= ~BV(PORTD7);
@@ -180,8 +131,6 @@ void setDirection(Direction direction) {
   default:
     break;
   }
-
-  _delay_ms(500);
 }
 
 /// Limits give value by given minimum and maximum values.
@@ -216,22 +165,30 @@ int main() {
   #endif
 
   AveragingDataSet readings(0);
+  LimitSensor limitSensor(1);
+  Direction currentDirection = D_NONE;
   PiController controller(TARGET_EMF, POSITION_COEFF, INTEGRAL_COEFF);
   while(true) {
     // Run motor
-    _delay_ms(20);
-
-    // Disable pwm for measurement time
-    disablePwm();
+    _delay_ms(50);
 
     int16_t feed;
     _delay_ms(1);
-    Direction direction = senseRotationLimit();
-    switch(direction) {
+    Direction limit = limitSensor.senseLimit();
+
+    // Disable pwm during relay and back-emf manipulation to reduce error and
+    // transients
+    disablePwm();
+
+    switch(limit) {
     case D_CLOCKWISE:
     case D_COUNTER_CLOCKWISE:
-      setDirection(direction);
-      enablePwm();
+      if(limit == currentDirection) {
+        break;
+      }
+      _delay_ms(500);
+      setDirection(LimitSensor::opposite(limit));
+      _delay_ms(500);
       break;
     case D_NONE:
       for(int i = 0; i < AVG_WINDOW; i++) {
@@ -240,17 +197,17 @@ int main() {
       }
 
       feed = controller.control(readings.average());
-      feed = limit(feed, 0, 1023);
+      feed = ::limit(feed, 0, 1023);
 
-      enablePwm(feed/4);
-
-      #ifdef DEBUG
-        debug.printInfo(newPwm/64);
-      #endif
       break;
     case D_BOTH:
       //halt();
       break;
     }
+
+    enablePwm(feed/4);
+    #ifdef DEBUG
+      debug.printInfo(feed/64);
+    #endif
   }
 }
