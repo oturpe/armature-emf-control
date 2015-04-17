@@ -168,8 +168,6 @@ void initializeDirectionSetting() {
 ///    Direction to rotate to. For D_NONE or D_BOTH does not change the
 ///    direction.
 void setDirection(Direction direction) {
-
-  disablePwm();
   _delay_ms(500);
 
   switch(direction) {
@@ -184,7 +182,28 @@ void setDirection(Direction direction) {
   }
 
   _delay_ms(500);
-  enablePwm();
+}
+
+/// Limits give value by given minimum and maximum values.
+///
+/// \param value
+///    Value to limit
+///
+/// \param min
+///    Minimum value
+///
+/// \param max
+///    Maximum value
+///
+/// \return
+///    Limited value
+int16_t limit(int16_t value, int16_t min, int16_t max) {
+  if(value < min)
+    return min;
+  if(value > max)
+    return max;
+
+  return value;
 }
 
 int main() {
@@ -205,30 +224,33 @@ int main() {
     // Disable pwm for measurement time
     disablePwm();
 
+    int16_t feed;
+    _delay_ms(1);
     Direction direction = senseRotationLimit();
     switch(direction) {
     case D_CLOCKWISE:
     case D_COUNTER_CLOCKWISE:
       setDirection(direction);
+      enablePwm();
       break;
     case D_NONE:
-      // Nothing to do
+      for(int i = 0; i < AVG_WINDOW; i++) {
+        _delay_ms(1);
+        readings.add(senseEmf(), false);
+      }
+
+      feed = controller.control(readings.average());
+      feed = limit(feed, 0, 1023);
+
+      enablePwm(feed/4);
+
+      #ifdef DEBUG
+        debug.printInfo(newPwm/64);
+      #endif
       break;
     case D_BOTH:
       //halt();
       break;
     }
-
-    for(int i = 0; i < AVG_WINDOW; i++) {
-      _delay_ms(1);
-      readings.add(senseEmf(), false);
-    }
-
-    int16_t newPwm = controller.control(readings.average());
-    enablePwm(newPwm/4);
-
-    #ifdef DEBUG
-      debug.printInfo(newPwm/64);
-    #endif
   }
 }
