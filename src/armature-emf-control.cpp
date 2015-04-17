@@ -66,7 +66,7 @@ void disablePwm() {
 /// prescaler.
 void initializeAdc() {
   Atmega328p::setVoltageReference(Atmega328p::VREF_VCC);
-  Atmega328p::setAdcPrescalerValue(Atmega328p::ADC_PSV_128);
+  Atmega328p::setAdcPrescalerValue(Atmega328p::ADC_PSV_32);
 
   // Enable adc
   ADCSRA |= BV(ADEN);
@@ -170,7 +170,7 @@ void initializeDirectionSetting() {
 void setDirection(Direction direction) {
 
   disablePwm();
-  _delay_ms(1000);
+  _delay_ms(500);
 
   switch(direction) {
   case D_CLOCKWISE:
@@ -183,6 +183,7 @@ void setDirection(Direction direction) {
     break;
   }
 
+  _delay_ms(500);
   enablePwm();
 }
 
@@ -227,7 +228,7 @@ int main() {
     enablePwm(newPwm/4);
 
     #ifdef DEBUG
-      //debug.printInfo(4);
+      debug.printInfo(newPwm/64);
     #endif
   }
 }
