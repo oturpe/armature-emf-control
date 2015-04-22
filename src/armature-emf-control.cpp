@@ -73,7 +73,7 @@ void initializeAdc() {
   ADCSRA |= BV(ADEN);
 
 // Disable digital inout from pins that are used for adc.
-  DIDR0 |= BV(ADC0D) | BV(ADC1D) | BV(ADC2D);
+  DIDR0 |= BV(ADC0D) | BV(ADC1D) | BV(ADC2D) | BV(ADC3D);
 }
 
 /// Sense motor's electromotive force.
@@ -133,6 +133,44 @@ void setDirection(Direction direction) {
   }
 }
 
+uint16_t stationaryMotorEmf;
+
+/// Initializes speed setting by reading the counter-emf sense value and setting
+/// it as maximum possible. This value is used for calibrating the speed setting
+/// potentiometer reading.
+///
+/// This function must be called when the motor is not rotating to function as
+/// intended.
+void initializeSpeedSetting() {
+  // Select analog input ADC0
+   ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX1) & ~BV(MUX0);
+
+  // start conversion and wait until value is available
+  ADCSRA |= BV(ADSC);
+  while(ADCSRA & BV(ADSC));
+
+  // Measurement is done with inverse voltage. Invert again. A little bit of
+  // safety is added on top.
+  stationaryMotorEmf = (1023 - ADC) + 20;
+}
+
+/// Reads the speed setting potetiometer and returns value between minimum
+/// and maximum setting. Minimum value is configured with macro SPEED_MINIMUM,
+/// maximum is initialized during startup with initializeSpeedSetting() call.
+int16_t senseSpeedSetting() {
+// Select analog input ADC3
+   ADMUX &= ~BV(MUX3) & ~BV(MUX2);
+   ADMUX |= BV(MUX1) | BV(MUX0);
+
+  // start conversion and wait until value is available
+  ADCSRA |= BV(ADSC);
+  while(ADCSRA & BV(ADSC));
+
+  int32_t rawReading = ADC;
+  int32_t range = stationaryMotorEmf - TARGET_EMF_MINIMUM;
+  return ((rawReading * range)/1023) + TARGET_EMF_MINIMUM;
+}
+
 /// Limits give value by given minimum and maximum values.
 ///
 /// \param value
@@ -159,6 +197,7 @@ int main() {
   initializePwm();
   initializeAdc();
   initializeDirectionSetting();
+  initializeSpeedSetting();
 
   #ifdef DEBUG
     Debug debug(DEBUG_FREQ);
@@ -166,8 +205,8 @@ int main() {
 
   AveragingDataSet readings(0);
   LimitSensor limitSensor(1);
-  PiController controller(TARGET_EMF, POSITION_COEFF, INTEGRAL_COEFF);
   Direction currentLimit = D_NONE;
+  PiController controller(TARGET_EMF_MINIMUM, POSITION_COEFF, INTEGRAL_COEFF);
   while(true) {
     // Run motor
     _delay_ms(50);
@@ -175,6 +214,7 @@ int main() {
     int16_t feed;
     _delay_ms(1);
     Direction limit = limitSensor.senseLimit();
+    controller.setTarget(senseSpeedSetting());
 
     // Disable pwm during relay and back-emf manipulation to reduce error and
     // transients

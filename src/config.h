@@ -10,6 +10,10 @@
 
 // Target value for ir controller
 #define TARGET_EMF /*245*/ 300
+// Smallest value that can be set for target emf. This value should be a little
+// less that the smallest value that makes the motor move to maximize range of
+// speed setting potentiometer.
+#define TARGET_EMF_MINIMUM 200
 // How many points of difference is needed change pwm by one step
 #define POSITION_COEFF 1
 #define INTEGRAL_COEFF 2

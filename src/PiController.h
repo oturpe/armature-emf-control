@@ -14,6 +14,9 @@ public:
   ///    Integral coefficient. Larger value means less effect.
   PiController(int16_t target, int16_t positionCoeff, int16_t integralCoeff);
 
+/// Sets the target value.
+void setTarget(int16_t newTarget);
+
   /// Request new control value based on input.
   ///
   /// \param input

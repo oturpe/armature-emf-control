@@ -9,6 +9,10 @@ PiController::PiController(int16_t target,
     integral(0) {
 }
 
+void PiController::setTarget(int16_t newTarget) {
+  target = newTarget;
+}
+
 int16_t PiController::control(int16_t input) {
   int16_t position = input - target;
   integral += position;
