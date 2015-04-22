@@ -91,7 +91,7 @@ void initializeAdc() {
 ///   Voltage inverse
 uint16_t senseEmf() {
   // Select analog input ADC0
-   ADMUX &= ~BV(MUX0) & ~BV(MUX1) & ~BV(MUX2) & ~BV(MUX3);
+   ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX1) & ~BV(MUX0);
 
   // start conversion and wait until value is available
   ADCSRA |= BV(ADSC);
