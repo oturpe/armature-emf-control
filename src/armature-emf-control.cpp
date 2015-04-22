@@ -166,8 +166,8 @@ int main() {
 
   AveragingDataSet readings(0);
   LimitSensor limitSensor(1);
-  Direction currentDirection = D_NONE;
   PiController controller(TARGET_EMF, POSITION_COEFF, INTEGRAL_COEFF);
+  Direction currentLimit = D_NONE;
   while(true) {
     // Run motor
     _delay_ms(50);
@@ -180,14 +180,17 @@ int main() {
     // transients
     disablePwm();
 
+    Direction newDirection;
     switch(limit) {
     case D_CLOCKWISE:
     case D_COUNTER_CLOCKWISE:
-      if(limit == currentDirection) {
+      if(limit == currentLimit) {
         break;
       }
       _delay_ms(500);
-      setDirection(LimitSensor::opposite(limit));
+      newDirection = LimitSensor::opposite(limit);
+      setDirection(newDirection);
+      currentLimit = limit;
       _delay_ms(500);
       break;
     case D_NONE:

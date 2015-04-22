@@ -20,12 +20,12 @@ Direction LimitSensor::opposite(Direction direction) {
   }
 
 LimitSensor::LimitSensor(uint16_t sensingInterval)
-  : sensingInterval(sensingInterval) {
+  : counter(0), sensingInterval(sensingInterval) {
 }
 
 Direction LimitSensor::senseLimit() {
   counter = (counter + 1) % sensingInterval;
-  if (sensingInterval)
+  if (counter)
     return D_NONE;
 
   bool clockwiseSensor = false;
