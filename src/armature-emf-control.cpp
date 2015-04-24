@@ -133,27 +133,6 @@ void setDirection(Direction direction) {
   }
 }
 
-uint16_t stationaryMotorEmf;
-
-/// Initializes speed setting by reading the counter-emf sense value and setting
-/// it as maximum possible. This value is used for calibrating the speed setting
-/// potentiometer reading.
-///
-/// This function must be called when the motor is not rotating to function as
-/// intended.
-void initializeSpeedSetting() {
-  // Select analog input ADC0
-   ADMUX &= ~BV(MUX3) & ~BV(MUX2) & ~BV(MUX1) & ~BV(MUX0);
-
-  // start conversion and wait until value is available
-  ADCSRA |= BV(ADSC);
-  while(ADCSRA & BV(ADSC));
-
-  // Measurement is done with inverse voltage. Invert again. A little bit of
-  // safety is added on top.
-  stationaryMotorEmf = (1023 - ADC) + 20;
-}
-
 /// Reads the speed setting potetiometer and returns value between minimum
 /// and maximum setting. Minimum value is configured with macro SPEED_MINIMUM,
 /// maximum is initialized during startup with initializeSpeedSetting() call.
@@ -167,8 +146,7 @@ int16_t senseSpeedSetting() {
   while(ADCSRA & BV(ADSC));
 
   int32_t rawReading = ADC;
-  int32_t range = stationaryMotorEmf - TARGET_EMF_MINIMUM;
-  return ((rawReading * range)/1023) + TARGET_EMF_MINIMUM;
+  return (rawReading / 4) + TARGET_EMF_MINIMUM;
 }
 
 /// Limits give value by given minimum and maximum values.
@@ -197,7 +175,6 @@ int main() {
   initializePwm();
   initializeAdc();
   initializeDirectionSetting();
-  initializeSpeedSetting();
 
   #ifdef DEBUG
     Debug debug(DEBUG_FREQ);
@@ -205,34 +182,57 @@ int main() {
 
   AveragingDataSet readings(0);
   LimitSensor limitSensor(1);
-  Direction currentLimit = D_NONE;
-  PiController controller(TARGET_EMF_MINIMUM, POSITION_COEFF, INTEGRAL_COEFF);
+
+  PiController controller(TARGET_EMF_MINIMUM,
+                          CONTROL_P_COEFF,
+                          CONTROL_I_COEFF,
+                          CONTROL_TARGET_RES);
+
+  // Temporary variables
+  uint16_t counter = 0;
+  Direction currentLimit = D_COUNTER_CLOCKWISE;
+  Direction newLimit = D_NONE;
+  Direction newDirection;
+  int16_t feed;
+  int16_t controlValue;
   while(true) {
     // Run motor
-    _delay_ms(50);
+    _delay_ms(10);
 
-    int16_t feed;
-    _delay_ms(1);
-    Direction limit = limitSensor.senseLimit();
-    controller.setTarget(senseSpeedSetting());
+    counter += 1;
 
     // Disable pwm during relay and back-emf manipulation to reduce error and
     // transients
     disablePwm();
 
-    Direction newDirection;
-    switch(limit) {
+    if(!(counter % LOOP_SENSE_FREQ_LIMIT)) {
+      newLimit = limitSensor.senseLimit();
+    } else {
+      newLimit = D_NONE;
+    }
+
+    if(!(counter % LOOP_SENSE_FREQ_SPEED)) {
+      int16_t newSpeed = senseSpeedSetting();
+      newSpeed += (currentLimit == D_CLOCKWISE) ? OFFSET_CW : -OFFSET_CW;
+      controller.setTarget(newSpeed);
+    }
+
+    switch(newLimit) {
     case D_CLOCKWISE:
     case D_COUNTER_CLOCKWISE:
-      if(limit == currentLimit) {
+      if(newLimit == currentLimit) {
         break;
       }
+
       _delay_ms(500);
-      newDirection = LimitSensor::opposite(limit);
+
+      newDirection = LimitSensor::opposite(newLimit);
       setDirection(newDirection);
-      currentLimit = limit;
+      currentLimit = newLimit;
+
       _delay_ms(500);
       break;
+
     case D_NONE:
       for(int i = 0; i < AVG_WINDOW; i++) {
         _delay_ms(1);
@@ -243,6 +243,7 @@ int main() {
       feed = ::limit(feed, 0, 1023);
 
       break;
+
     case D_BOTH:
       //halt();
       break;
