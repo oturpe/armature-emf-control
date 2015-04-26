@@ -14,12 +14,18 @@
 // Smallest value that can be set for target emf. This value should be a little
 // less that the smallest value that makes the motor move to maximize range of
 // speed setting potentiometer.
-#define TARGET_EMF_MINIMUM 200
+#define TARGET_EMF_MINIMUM 170
+// Scaler for dividing potentiometer reading to acquire target emf
+// value.
+#define TARGET_EMF_SCALER 3
 // How many points of difference is needed change pwm by one step
 #define CONTROL_P_COEFF 2
 #define CONTROL_I_COEFF 5
 
-#define CONTROL_TARGET_RES 5
+// Minimum change of pi controller resolution change that is regocnized. The
+// purpose of this value is to stop resetting of controller integral value
+// due to variance in potentiometer reading.
+#define CONTROL_TARGET_RES 3
 
 #define POSITION_SENSOR_THRESHOLD_CW 450
 #define POSITION_SENSOR_THRESHOLD_CCW 450

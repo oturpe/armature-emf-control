@@ -146,7 +146,7 @@ int16_t senseSpeedSetting() {
   while(ADCSRA & BV(ADSC));
 
   int32_t rawReading = ADC;
-  return (rawReading / 4) + TARGET_EMF_MINIMUM;
+  return (rawReading / TARGET_EMF_SCALER) + TARGET_EMF_MINIMUM;
 }
 
 /// Limits give value by given minimum and maximum values.
@@ -172,6 +172,9 @@ int16_t limit(int16_t value, int16_t min, int16_t max) {
 }
 
 int main() {
+  // Wait for powr supply capacitors to charge etc.
+  _delay_ms(1000);
+
   initializePwm();
   initializeAdc();
   initializeDirectionSetting();
