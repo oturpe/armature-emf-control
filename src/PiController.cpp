@@ -24,6 +24,6 @@ int16_t PiController::control(int16_t input) {
   int16_t position = input - target;
   integral += position;
 
-  int16_t change = (position / positionCoeff) + (integral / integralCoeff);
+  int16_t change = (position * positionCoeff) + (integral * integralCoeff);
   return target - change;
 }
