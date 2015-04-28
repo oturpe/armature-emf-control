@@ -46,7 +46,7 @@ private:
   int16_t positionCoeff;
 
   /// Coefficient of integral value in pi controller equation.
-  int16_t integralCoeff;
+  int16_t integralDivisor;
 
   /// Resolution for changing target.
   int16_t resolution;

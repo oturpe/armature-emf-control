@@ -188,7 +188,7 @@ int main() {
 
   PiController controller(TARGET_EMF_MINIMUM,
                           CONTROL_P_COEFF,
-                          CONTROL_I_COEFF,
+                          CONTROL_I_DIVISOR,
                           CONTROL_TARGET_RES);
 
   // Temporary variables
